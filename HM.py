@@ -21,14 +21,91 @@ import customtkinter as ctk
 # DEFAULT PROMPTS & SETTINGS
 # ============================================================
 
-DEFAULT_PROMPT_PHAN_TICH = """Hãy đóng vai chuyên gia ngôn ngữ, soạn thảo một 'BỘ LUẬT DỊCH THUẬT' chi tiết TRONG CODE BLOCK dựa trên nội dung phim được cung cấp dưới đây:
-1. Xác định Thể loại & Thời đại (Cổ trang/Hiện đại/Học đường...).
-2. PHÂN TÍCH NHÂN VẬT & QUAN HỆ (QUAN TRỌNG NHẤT):
-   - Tìm các tên riêng -> Xác định Giới tính.
-   - Xác định quan hệ: Ai bề trên, ai bề dưới. Cách xưng hô (Ta - Ngươi, Anh - Em...).
-3. Bảng Từ vựng BẮT BUỘC DÙNG (VD: Cổ trang dùng 'Đa tạ', 'Huynh').
-4. Bảng Từ vựng CẤM TUYỆT ĐỐI (VD: Cổ trang cấm 'Ok', 'Bye').
-5. Xử lý từ cảm thán: '哈' -> 'ha ha!', '哎' -> 'Ây/Haizz'."""
+DEFAULT_PROMPT_PHAN_TICH = """BẠN LÀ CHUYÊN GIA PHÂN TÍCH PHIM & BIÊN DỊCH CHUYÊN NGHIỆP.
+Dựa trên nội dung phụ đề phim được cung cấp, hãy soạn một 'BỘ LUẬT DỊCH THUẬT' chi tiết, đầy đủ.
+Trả kết quả TRONG MỘT CODE BLOCK DUY NHẤT để dễ sao chép.
+
+═══════════════════════════════════════
+BỘ LUẬT DỊCH THUẬT CẦN BAO GỒM:
+═══════════════════════════════════════
+
+【1】 THỂ LOẠI & BỐI CẢNH
+- Xác định thể loại phim: Cổ trang/Tiên hiệp/Đô thị/Học đường/Ngôn tình/Huyền huyễn/Xuyên không...
+- Thời đại: Cổ đại/Hiện đại/Tương lai
+- Bối cảnh chính: Giang hồ/Triều đình/Công ty/Trường học/Tu tiên giới...
+- Tone phim: Nghiêm túc/Hài hước/Lãng mạn/Kịch tính/Bi thương
+
+【2】 BẢNG NHÂN VẬT & QUAN HỆ (QUAN TRỌNG NHẤT)
+Liệt kê TẤT CẢ nhân vật xuất hiện theo bảng:
+| Tên gốc (中文) | Tên Hán Việt | Giới tính | Vai trò/Thân phận | Tính cách nổi bật |
+
+Sau đó xác định QUAN HỆ giữa các nhân vật:
+- Ai là bề trên / bề dưới?
+- Ai là bạn / thù / người yêu / gia đình?
+- Mối quan hệ đặc biệt (sư đồ, huynh đệ, chủ tớ, tình địch...)?
+
+【3】 QUY TẮC XƯNG HÔ CHI TIẾT
+Dựa trên quan hệ, xác định CHÍNH XÁC cách xưng hô cho từng cặp nhân vật:
+
+★ Cổ trang/Tiên hiệp:
+  - Bề trên → bề dưới: Ta/Ngươi, Lão phu/Tiểu tử, Bổn tọa/Thuộc hạ
+  - Ngang hàng: Huynh/Đệ, Tỷ/Muội, Đạo hữu
+  - Tình cảm: Nàng/Chàng, Thiếp/Lang quân, Phu nhân/Tướng quân
+  - Kính trọng: Tiền bối, Sư phụ, Chưởng môn
+
+★ Hiện đại/Đô thị:
+  - Công sở: Tôi/Anh(Chị), Giám đốc/Nhân viên
+  - Tình cảm: Anh/Em, Bé/Cưng
+  - Bạn bè: Tao/Mày, Tớ/Cậu, Ông/Bà (thân)
+  - Gia đình: Ba/Mẹ/Con, Ông/Bà/Cháu
+
+【4】 TỪ VỰNG BẮT BUỘC DÙNG (theo thể loại)
+Liệt kê các từ/cụm từ PHÙ HỢP thể loại phim:
+
+★ Cổ trang: Đa tạ, Cáo từ, Huynh đài, Tại hạ, Cô nương, Đại hiệp, Bẩm báo, Xin lĩnh giáo...
+★ Tu tiên: Linh khí, Đan dược, Đột phá, Cảnh giới, Kiếm khí, Nguyên thần, Phi thăng...
+★ Hiện đại: Nói thẳng ra, Thôi được rồi, Kệ đi, Tùy anh/chị...
+
+【5】 TỪ VỰNG CẤM TUYỆT ĐỐI (theo thể loại)
+Liệt kê các từ KHÔNG ĐƯỢC DÙNG vì sai thời đại/phong cách:
+
+★ Cổ trang CẤM: OK, Bye, Sorry, Ê, Wow, Bro, Oke, Xong chưa bro...
+★ Hiện đại CẤM: Tại hạ, Bổn tọa, Ngươi, Huynh đài, Tiểu thư (trừ khi châm biếm)...
+
+【6】 QUY TẮC XỬ LÝ TÊN RIÊNG
+- Tên người: Phiên âm Hán Việt (VD: 林玄霜 = Lâm Huyền Sương)
+- Tên tổ chức/môn phái: Dịch Hán Việt (VD: 天剑宗 = Thiên Kiếm Tông)
+- Tên chiêu thức: Hán Việt (VD: 飞龙在天 = Phi Long Tại Thiên)
+- Tên địa danh: Hán Việt nếu quen (长安 = Trường An)
+- Danh xưng đặc biệt: Giữ nhất quán suốt phim
+
+【7】 XỬ LÝ CẢM THÁN & NGỮ KHÍ
+Quy định cách dịch các từ cảm thán thường gặp:
+- 哈哈/哈哈哈 -> Ha ha! / Hahaha!
+- 哎/唉 -> Haizz / Ây / Than ôi
+- 哼 -> Hừ! / Hứ!
+- 呸 -> Khạc! / Tch!
+- 哇 -> Ồ! / Woa!
+- 嘻嘻 -> Hí hí / Hi hi
+- 啊/呀 -> A! / Ôi! / Trời!
+- 喂 -> Ê! / Này! / Alô!
+- 嗯 -> Ừ / Ừm
+- 哦/噢 -> Ồ / À / Ra vậy
+
+【8】 QUY TẮC GIỌNG ĐIỆU NHÂN VẬT
+Mô tả giọng điệu đặc trưng của từng nhân vật chính:
+- Nhân vật A: Nói năng thế nào? (Kiêu ngạo/Nhẹ nhàng/Hài hước/Lạnh lùng...)
+- Nhân vật B: Phong cách giao tiếp ra sao?
+→ Giúp người dịch giữ đúng "giọng" từng nhân vật xuyên suốt phim.
+
+【9】 CÁC TÌNH HUỐNG ĐẶC BIỆT
+- Lời bài hát (nếu có): Dịch thơ/vần hay dịch nghĩa?
+- Thơ cổ/câu đối: Giữ phong cách cổ hay dịch dễ hiểu?
+- Nội tâm (旁白): Dùng ngôi thứ nhất, giọng tự sự
+- Hét chiêu thức: Giữ Hán Việt + giải thích lần đầu xuất hiện?
+
+【10】 TÓM TẮT NỘI DUNG PHIM (3-5 câu)
+Tóm tắt ngắn gọn cốt truyện chính để người dịch nắm bối cảnh tổng thể."""
 
 DEFAULT_PROMPT_DICH = """BẠN LÀ CHUYÊN GIA DỊCH PHỤ ĐỀ PHIM TRUNG QUỐC SANG TIẾNG VIỆT.
 Hãy dịch các dòng dưới đây sao cho MỌI CÂU đều mượt mà, tự nhiên như người Việt nói hàng ngày.
