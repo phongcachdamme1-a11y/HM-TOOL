@@ -697,7 +697,7 @@ class HMAutoTranslator(ctk.CTk):
         def save_rules():
             self.context_rules = result_text.get("1.0", "end").strip()
             self._log("Đã lưu bộ luật dịch vào RAM!")
-            messagebox.showinfo("Thành công", "Đã lưu bộ luật!")
+            win.destroy()
         
         ctk.CTkButton(left, text="LƯU BỘ LUẬT", command=save_rules, fg_color="#27AE60").pack(fill="x", padx=10, pady=5)
         
