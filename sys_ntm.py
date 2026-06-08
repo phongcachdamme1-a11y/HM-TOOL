@@ -107,12 +107,12 @@ async def init_browser(req: InitRequest):
         
         # Navigate to AI chat
         if target_ai == "gemini":
-            url = "https://gemini.google.com/"
+            url = "https://gemini.google.com/app"
         else:
             url = "https://chat.deepseek.com/"
         
         await page.goto(url, wait_until="domcontentloaded")
-        await asyncio.sleep(3)
+        await asyncio.sleep(5)
         
         return {"status": "ok", "message": f"Browser initialized for {target_ai}"}
     
@@ -137,6 +137,287 @@ async def stop_generation():
         return {"status": "no_generation"}
 
 
+async def _send_to_gemini(prompt_text):
+    """Send prompt to Gemini - handles both logged-in and not-logged-in states"""
+    global page
+    
+    cmd_ctrl = "Meta" if sys.platform == "darwin" else "Control"
+    
+    # JavaScript to set clipboard
+    js_copy_code = """
+    async (text) => {
+        try {
+            await navigator.clipboard.writeText(text);
+        } catch (e) {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.position = "fixed";
+            textArea.style.left = "-9999px";
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            document.execCommand("copy");
+            document.body.removeChild(textArea);
+        }
+    }
+    """
+    
+    await page.evaluate(js_copy_code, prompt_text)
+    await asyncio.sleep(0.5)
+    
+    # Try multiple selectors for Gemini input (covers logged-in and not-logged-in)
+    input_selectors = [
+        ".ql-editor",                              # Quill editor (logged in)
+        "div[contenteditable='true']",             # Generic contenteditable
+        ".text-input-field",                       # Alternative input
+        "rich-textarea div[contenteditable]",      # Rich textarea
+        "div[aria-label*='prompt']",               # Aria label prompt
+        "div[aria-label*='Enter']",                # Enter a prompt
+        "textarea",                                # Fallback textarea
+    ]
+    
+    input_box = None
+    for selector in input_selectors:
+        try:
+            loc = page.locator(selector).first
+            if await loc.count() > 0 and await loc.is_visible():
+                input_box = loc
+                break
+        except:
+            continue
+    
+    if not input_box:
+        # Last resort: try to find any contenteditable element
+        input_box = page.locator("[contenteditable='true']").first
+        if await input_box.count() == 0:
+            raise Exception("Khong tim thay o nhap lieu Gemini. Hay thu refresh trang.")
+    
+    # Click and focus
+    await input_box.click()
+    await asyncio.sleep(0.3)
+    
+    # Clear existing text
+    await page.keyboard.press(f"{cmd_ctrl}+A")
+    await asyncio.sleep(0.1)
+    await page.keyboard.press("Backspace")
+    await asyncio.sleep(0.3)
+    
+    # Paste from clipboard
+    await page.keyboard.press(f"{cmd_ctrl}+V")
+    await asyncio.sleep(1.0)
+    
+    # Try to click send button with multiple selectors
+    send_selectors = [
+        "button[aria-label*='Send']",
+        "button[aria-label*='Gửi']",
+        "button[aria-label*='send']",
+        "button.send-button",
+        "button[data-testid*='send']",
+        ".send-button-container button",
+        "button[mat-icon-button][aria-label*='Send']",
+    ]
+    
+    sent = False
+    for selector in send_selectors:
+        try:
+            btn = page.locator(selector).first
+            if await btn.count() > 0 and await btn.is_visible():
+                await asyncio.sleep(0.3)
+                await btn.click()
+                sent = True
+                break
+        except:
+            continue
+    
+    if not sent:
+        # Fallback: press Enter
+        await page.keyboard.press("Enter")
+    
+    return True
+
+
+async def _send_to_deepseek(prompt_text):
+    """Send prompt to DeepSeek"""
+    global page
+    
+    cmd_ctrl = "Meta" if sys.platform == "darwin" else "Control"
+    
+    # JavaScript to set clipboard
+    js_copy_code = """
+    async (text) => {
+        try {
+            await navigator.clipboard.writeText(text);
+        } catch (e) {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.position = "fixed";
+            textArea.style.left = "-9999px";
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            document.execCommand("copy");
+            document.body.removeChild(textArea);
+        }
+    }
+    """
+    
+    await page.evaluate(js_copy_code, prompt_text)
+    await asyncio.sleep(0.3)
+    
+    # DeepSeek: use textarea
+    textarea = page.locator("textarea").first
+    await textarea.wait_for(state="visible", timeout=30000)
+    await textarea.click()
+    
+    # Clear existing text
+    await page.keyboard.press(f"{cmd_ctrl}+A")
+    await page.keyboard.press("Backspace")
+    await asyncio.sleep(0.2)
+    
+    # Paste
+    await page.keyboard.press(f"{cmd_ctrl}+V")
+    await asyncio.sleep(0.5)
+    
+    # Press Enter or click send button
+    await asyncio.sleep(0.3)
+    send_btn = page.locator("div[class*='chat-input'] button, button[aria-label*='Send']").first
+    if await send_btn.count() > 0 and await send_btn.is_visible():
+        await send_btn.click()
+    else:
+        await page.keyboard.press("Enter")
+    
+    return True
+
+
+async def _wait_for_response_gemini():
+    """Wait for Gemini response to complete"""
+    global page
+    
+    await asyncio.sleep(4)
+    
+    start_time = asyncio.get_event_loop().time()
+    last_length = 0
+    idle_seconds = 0
+    max_wait = 900  # 15 minutes max
+    
+    while True:
+        elapsed = asyncio.get_event_loop().time() - start_time
+        if elapsed > max_wait:
+            return {"status": "timeout", "text": "Timeout"}
+        
+        # Gemini response selectors - multiple options
+        response_selectors = [
+            "model-response",
+            "message-content",
+            ".message-content",
+            ".model-response-text",
+            ".response-container",
+            "div[data-message-author-role='model']",
+            ".markdown-main-panel",
+        ]
+        
+        messages = None
+        for selector in response_selectors:
+            loc = page.locator(selector)
+            if await loc.count() > 0:
+                messages = loc
+                break
+        
+        if not messages or await messages.count() == 0:
+            await asyncio.sleep(1)
+            continue
+        
+        # Get last message text
+        last_msg = messages.last
+        try:
+            text_for_len = await last_msg.inner_text()
+        except:
+            await asyncio.sleep(1)
+            continue
+        
+        current_length = len(text_for_len)
+        
+        if current_length == last_length and current_length > 0:
+            idle_seconds += 1
+            if idle_seconds >= 8:  # Gemini can be slower, wait 8s idle
+                break
+        else:
+            idle_seconds = 0
+            last_length = current_length
+        
+        await asyncio.sleep(1)
+    
+    # Extract final text - prefer code block content
+    last_msg = messages.last
+    try:
+        pre_elements = last_msg.locator("pre, code-block")
+        if await pre_elements.count() > 0:
+            final_text = await pre_elements.last.inner_text()
+        else:
+            final_text = await last_msg.inner_text()
+    except:
+        final_text = await last_msg.inner_text()
+    
+    return {"status": "ok", "text": final_text}
+
+
+async def _wait_for_response_deepseek():
+    """Wait for DeepSeek response to complete"""
+    global page
+    
+    await asyncio.sleep(3)
+    
+    start_time = asyncio.get_event_loop().time()
+    last_length = 0
+    idle_seconds = 0
+    max_wait = 900  # 15 minutes max
+    
+    while True:
+        elapsed = asyncio.get_event_loop().time() - start_time
+        if elapsed > max_wait:
+            return {"status": "timeout", "text": "Timeout"}
+        
+        messages = page.locator(".ds-message")
+        msg_count = await messages.count()
+        if msg_count == 0:
+            await asyncio.sleep(1)
+            continue
+        
+        last_msg = messages.last
+        
+        # Get text content
+        md_blocks = last_msg.locator(".ds-markdown")
+        if await md_blocks.count() > 0:
+            text_for_len = await md_blocks.last.inner_text()
+        else:
+            text_for_len = await last_msg.inner_text()
+        
+        current_length = len(text_for_len)
+        
+        if current_length == last_length and current_length > 0:
+            idle_seconds += 1
+            if idle_seconds >= 6:
+                break
+        else:
+            idle_seconds = 0
+            last_length = current_length
+        
+        await asyncio.sleep(1)
+    
+    # Extract final text - prefer code block content
+    md_blocks = last_msg.locator(".ds-markdown")
+    if await md_blocks.count() > 0:
+        pre_elements = md_blocks.last.locator("pre")
+        if await pre_elements.count() > 0:
+            final_text = await pre_elements.last.inner_text()
+        else:
+            final_text = await md_blocks.last.inner_text()
+    else:
+        final_text = await last_msg.inner_text()
+    
+    return {"status": "ok", "text": final_text}
+
+
 @app.post("/chat")
 async def chat_with_ai(req: ChatRequest):
     """Send message to AI and wait for response"""
@@ -146,150 +427,17 @@ async def chat_with_ai(req: ChatRequest):
         raise HTTPException(status_code=400, detail="Browser not initialized")
     
     try:
-        # Determine keyboard modifier
-        cmd_ctrl = "Meta" if sys.platform == "darwin" else "Control"
-        
-        # JavaScript to copy text to clipboard
-        js_copy_code = """
-        async (text) => {
-            try {
-                await navigator.clipboard.writeText(text);
-            } catch (e) {
-                const textArea = document.createElement("textarea");
-                textArea.value = text;
-                document.body.appendChild(textArea);
-                textArea.focus();
-                textArea.select();
-                document.execCommand("copy");
-                document.body.removeChild(textArea);
-            }
-        }
-        """
-        
-        # Copy prompt to clipboard
-        await page.evaluate(js_copy_code, req.prompt)
-        await asyncio.sleep(0.2)
-        
         if current_ai == "gemini":
-            # Gemini: use .ql-editor
-            input_box = page.locator(".ql-editor").first
-            await input_box.wait_for(state="visible", timeout=30000)
-            await input_box.click()
-            
-            # Clear existing text
-            await page.keyboard.press(f"{cmd_ctrl}+A")
-            await page.keyboard.press("Backspace")
-            await asyncio.sleep(0.2)
-            
-            # Paste
-            await page.keyboard.press(f"{cmd_ctrl}+V")
-            await asyncio.sleep(0.5)
-            await page.keyboard.press("Space")
-            await asyncio.sleep(0.5)
-            
-            # Send
-            send_btn = page.locator("button[aria-label*='Send'], button[aria-label*='Gửi']").first
-            if await send_btn.count() > 0 and await send_btn.is_visible():
-                await send_btn.click()
-            else:
-                await page.keyboard.press("Enter")
+            await _send_to_gemini(req.prompt)
+            result = await _wait_for_response_gemini()
         else:
-            # DeepSeek: use textarea
-            textarea = page.locator("textarea").first
-            await textarea.wait_for(state="visible", timeout=30000)
-            await textarea.click()
-            
-            # Clear existing text
-            await page.keyboard.press(f"{cmd_ctrl}+A")
-            await page.keyboard.press("Backspace")
-            await asyncio.sleep(0.2)
-            
-            # Paste
-            await page.keyboard.press(f"{cmd_ctrl}+V")
-            await asyncio.sleep(0.5)
-            
-            # Press Enter or click send button  
-            await asyncio.sleep(0.3)
-            send_btn = page.locator("div[class*='chat-input'] button, button[aria-label*='Send']").first
-            if await send_btn.count() > 0 and await send_btn.is_visible():
-                await send_btn.click()
-            else:
-                await page.keyboard.press("Enter")
-        
-        # Wait for response
-        await asyncio.sleep(3)
-        
-        # Wait for AI to finish generating (max 15 minutes for large batches)
-        start_time = asyncio.get_event_loop().time()
-        last_length = 0
-        idle_seconds = 0
-        max_wait = 900  # 15 minutes max
-        
-        while True:
-            elapsed = asyncio.get_event_loop().time() - start_time
-            if elapsed > max_wait:
-                return {"status": "timeout", "text": "Timeout"}
-            
-            # Check if generation is complete by monitoring text length
-            if current_ai == "gemini":
-                messages = page.locator("model-response, message-content, .message-content, .markdown")
-            else:
-                messages = page.locator(".ds-message")
-            
-            msg_count = await messages.count()
-            if msg_count == 0:
-                await asyncio.sleep(1)
-                continue
-            
-            # Get last message
-            last_msg = messages.last
-            
-            # Get text content
-            if current_ai == "deepseek":
-                md_blocks = last_msg.locator(".ds-markdown")
-                if await md_blocks.count() > 0:
-                    text_for_len = await md_blocks.last.inner_text()
-                else:
-                    text_for_len = await last_msg.inner_text()
-            else:
-                text_for_len = await last_msg.inner_text()
-            
-            current_length = len(text_for_len)
-            
-            if current_length == last_length and current_length > 0:
-                idle_seconds += 1
-                if idle_seconds >= 6:
-                    # AI finished generating
-                    break
-            else:
-                idle_seconds = 0
-                last_length = current_length
-            
-            await asyncio.sleep(1)
-        
-        # Extract final text - prefer code block content
-        if current_ai == "deepseek":
-            md_blocks = last_msg.locator(".ds-markdown")
-            if await md_blocks.count() > 0:
-                # Check for code blocks (pre elements)
-                pre_elements = md_blocks.last.locator("pre")
-                if await pre_elements.count() > 0:
-                    final_text = await pre_elements.last.inner_text()
-                else:
-                    final_text = await md_blocks.last.inner_text()
-            else:
-                final_text = await last_msg.inner_text()
-        else:
-            pre_elements = last_msg.locator("pre")
-            if await pre_elements.count() > 0:
-                final_text = await pre_elements.last.inner_text()
-            else:
-                final_text = await last_msg.inner_text()
+            await _send_to_deepseek(req.prompt)
+            result = await _wait_for_response_deepseek()
         
         # Scroll to end
         await page.keyboard.press("End")
         
-        return {"status": "ok", "text": final_text}
+        return result
     
     except Exception as e:
         return {"status": "error", "text": str(e)}

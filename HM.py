@@ -30,10 +30,12 @@ DEFAULT_PROMPT_PHAN_TICH = """Hãy đóng vai chuyên gia ngôn ngữ, soạn th
 4. Bảng Từ vựng CẤM TUYỆT ĐỐI (VD: Cổ trang cấm 'Ok', 'Bye').
 5. Xử lý từ cảm thán: '哈' -> 'ha ha!', '哎' -> 'Ây/Haizz'."""
 
-DEFAULT_PROMPT_DICH = """DỊCH CÁC DÒNG DƯỚI ĐÂY SANG TIẾNG VIỆT.
+DEFAULT_PROMPT_DICH = """DỊCH CÁC DÒNG DƯỚI ĐÂY SANG TIẾNG VIỆT (DỊCH NGHĨA, KHÔNG PHIÊN ÂM).
 YÊU CẦU CỐT LÕI:
 1. Giữ nguyên ID [số]. Trả về dạng Code Block.
-2. XỬ LÝ CHÚ THÍCH: (nhạc), (vỗ tay)... -> Giữ ID, trả nội dung rỗng. Ví dụ: '[1] '."""
+2. DỊCH NGHĨA tự nhiên sang tiếng Việt. TUYỆT ĐỐI KHÔNG phiên âm Hán Việt nguyên văn. Phải dịch thành câu tiếng Việt có nghĩa, dễ hiểu.
+3. XỬ LÝ CHÚ THÍCH: (nhạc), (vỗ tay)... -> Giữ ID, trả nội dung rỗng. Ví dụ: '[1] '.
+4. Mỗi dòng dịch phải là tiếng Việt thuần túy, mạch lạc, đúng ngữ cảnh phim."""
 
 DEFAULT_PROMPT_CONTENT = """Dựa vào TOÀN BỘ nội dung phụ đề phim dưới đây, hãy trở thành một chuyên gia Marketing và viết giúp tôi:
 1. 05 Tiêu đề giật tít, thu hút người xem (phù hợp làm mồi câu view).
@@ -400,7 +402,28 @@ class HMAutoTranslator(ctk.CTk):
         
         # Setup progress file for resume
         self.progress_file = filepath + ".progress.json"
-        self._load_progress()
+        
+        # Check if progress file exists - ask user
+        if os.path.exists(self.progress_file):
+            answer = messagebox.askyesno(
+                "Tìm thấy tiến trình cũ",
+                "Đã có tiến trình dịch trước đó.\n\n"
+                "• Nhấn CÓ để tiếp tục tiến trình cũ\n"
+                "• Nhấn KHÔNG để dịch lại từ đầu"
+            )
+            if answer:
+                self._load_progress()
+                self._log(f"Tiếp tục tiến trình cũ: {len(self.translated)}/{len(self.subtitles)} dòng đã dịch")
+            else:
+                self.translated = {}
+                # Delete old progress file
+                try:
+                    os.remove(self.progress_file)
+                except:
+                    pass
+                self._log("Đã xóa tiến trình cũ, dịch lại từ đầu.")
+        else:
+            self.translated = {}
         
         # Populate table
         self.tree.delete(*self.tree.get_children())
@@ -416,11 +439,12 @@ class HMAutoTranslator(ctk.CTk):
         
         self._log(f"Đã tải {len(self.subtitles)} dòng phụ đề từ: {os.path.basename(filepath)}")
         
-        # Check if there's saved progress
+        # Update progress bar
         done_count = len(self.translated)
         if done_count > 0:
-            self._log(f"Tìm thấy tiến trình cũ: {done_count}/{len(self.subtitles)} dòng đã dịch")
             self.progress.set(done_count / len(self.subtitles))
+        else:
+            self.progress.set(0)
     
     def _load_progress(self):
         """Load translation progress from file"""
