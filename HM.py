@@ -419,8 +419,9 @@ class HMAutoTranslator(ctk.CTk):
         self.tree.column("translated", width=350)
         
         # Tag for colored text in treeview
-        self.tree.tag_configure("original_row", foreground="#E8A0BF")  # Pink/purple for Chinese text
-        self.tree.tag_configure("translated_row", foreground="#90EE90")  # Light green for translated
+        self.tree.tag_configure("normal", foreground="#E0E0E0")           # Default white/gray
+        self.tree.tag_configure("translated", foreground="#90EE90")       # Green for translated rows
+        self.tree.tag_configure("missing", foreground="#FF4444", background="#1a0000")  # Red for missing/error rows
         
         scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscrollcommand=scrollbar.set)
@@ -540,13 +541,14 @@ class HMAutoTranslator(ctk.CTk):
         self.tree.delete(*self.tree.get_children())
         for sub in self.subtitles:
             translated = self.translated.get(sub['id'], "")
+            tag = "translated" if translated else "normal"
             self.tree.insert("", "end", values=(
                 "[X]" if translated else "",
                 sub['id'],
                 sub['time'],
                 sub['text'][:80],
                 translated[:80]
-            ))
+            ), tags=(tag,))
         
         self._log(f"Đã tải {len(self.subtitles)} dòng phụ đề từ: {os.path.basename(filepath)}")
         
@@ -758,10 +760,12 @@ class HMAutoTranslator(ctk.CTk):
         # Check errors
         missing_ids = [s['id'] for s in self.subtitles if s['id'] not in self.translated]
         if missing_ids:
-            self.btn_error.configure(text=f"PHÁT HIỆN {len(missing_ids)} DÒNG THIẾU", fg_color="#E74C3C", state="normal")
+            self.btn_error.configure(text=f"\u26A0 PHÁT HIỆN {len(missing_ids)} DÒNG THIẾU", fg_color="#E74C3C", state="normal")
             self._log(f"Các dòng chưa dịch: {missing_ids[:20]}...")
+            # Highlight missing rows in RED
+            self._highlight_missing_rows(missing_ids)
         else:
-            self.btn_error.configure(text="KHÔNG PHÁT HIỆN LỖI", fg_color="#27AE60")
+            self.btn_error.configure(text="\u2705 KHÔNG PHÁT HIỆN LỖI", fg_color="#27AE60")
     
     def _update_table(self):
         """Update treeview with translations"""
@@ -775,7 +779,15 @@ class HMAutoTranslator(ctk.CTk):
                     values[2],
                     values[3],
                     self.translated[line_id][:80]
-                ))
+                ), tags=("translated",))
+    
+    def _highlight_missing_rows(self, missing_ids):
+        """Highlight missing/untranslated rows in RED"""
+        for item in self.tree.get_children():
+            values = self.tree.item(item)['values']
+            line_id = int(values[1])
+            if line_id in missing_ids:
+                self.tree.item(item, tags=("missing",))
     
     def _open_analysis(self):
         """Open analysis window"""
