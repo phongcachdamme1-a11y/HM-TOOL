@@ -202,115 +202,172 @@ class HMAutoTranslator(ctk.CTk):
         self._start_backend()
     
     def _build_ui(self):
-        """Build the main UI"""
+        """Build the main UI - matching original tool style"""
         # Main layout: left panel + right table
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
         
         # Left Panel (controls)
-        left_frame = ctk.CTkScrollableFrame(self, width=260)
-        left_frame.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+        left_frame = ctk.CTkScrollableFrame(self, width=280, fg_color="#1e1e2e")
+        left_frame.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
         
         # === HE THONG ===
         ctk.CTkLabel(left_frame, text="HỆ THỐNG", text_color="#FF6B6B", font=("", 14, "bold")).pack(pady=(10,5))
         
         # AI Selection
-        ai_frame = ctk.CTkFrame(left_frame)
+        ai_frame = ctk.CTkFrame(left_frame, fg_color="transparent")
         ai_frame.pack(fill="x", padx=5, pady=2)
         ctk.CTkLabel(ai_frame, text="Lõi AI:").pack(side="left", padx=5)
         self.ai_var = ctk.StringVar(value="DeepSeek")
-        self.ai_combo = ctk.CTkComboBox(ai_frame, values=["DeepSeek", "Gemini"], variable=self.ai_var, width=120)
+        self.ai_combo = ctk.CTkComboBox(ai_frame, values=["DeepSeek", "Gemini"], variable=self.ai_var, width=140)
         self.ai_combo.pack(side="right", padx=5)
         
-        ctk.CTkButton(left_frame, text="1. Khởi chạy Trình duyệt", command=self._init_browser, fg_color="#4169E1").pack(fill="x", padx=5, pady=3)
-        ctk.CTkButton(left_frame, text="2. Tải file SRT", command=self._load_srt, fg_color="#4169E1").pack(fill="x", padx=5, pady=3)
+        # Buttons matching old tool colors
+        ctk.CTkButton(left_frame, text="1. Khởi chạy Trình duyệt", command=self._init_browser, 
+                      fg_color="#D4A017", hover_color="#B8860B", text_color="white",
+                      font=("", 12, "bold")).pack(fill="x", padx=5, pady=3)
+        ctk.CTkButton(left_frame, text="2. Tải file SRT", command=self._load_srt, 
+                      fg_color="#2E86C1", hover_color="#1B4F72", text_color="white",
+                      font=("", 12, "bold")).pack(fill="x", padx=5, pady=3)
         
         # === PHAN TICH ===
         ctk.CTkLabel(left_frame, text="PHÂN TÍCH & NGỮ CẢNH", text_color="#9B59B6", font=("", 12, "bold")).pack(pady=(15,5))
-        ctk.CTkButton(left_frame, text="Mở Bảng Phân Tích", command=self._open_analysis, fg_color="#F39C12").pack(fill="x", padx=5, pady=3)
-        ctk.CTkButton(left_frame, text="Sửa Prompt Phân Tích", command=lambda: self._edit_prompt("prompt_analysis.txt", DEFAULT_PROMPT_PHAN_TICH), fg_color="#555").pack(fill="x", padx=5, pady=3)
+        ctk.CTkButton(left_frame, text="\U0001f527 Mở Bảng Phân Tích", command=self._open_analysis, 
+                      fg_color="#D4A017", hover_color="#B8860B", text_color="white",
+                      font=("", 12, "bold")).pack(fill="x", padx=5, pady=3)
+        ctk.CTkButton(left_frame, text="\u2699 Sửa Prompt Phân Tích", 
+                      command=lambda: self._edit_prompt("prompt_analysis.txt", DEFAULT_PROMPT_PHAN_TICH), 
+                      fg_color="#4a4a5a", hover_color="#3a3a4a").pack(fill="x", padx=5, pady=3)
         
         # === CONTENT ===
         ctk.CTkLabel(left_frame, text="TẠO CONTENT ĐĂNG BÀI", text_color="#E74C3C", font=("", 12, "bold")).pack(pady=(15,5))
-        ctk.CTkButton(left_frame, text="Phân tích lấy Tiêu đề / Hashtag", command=self._generate_content, fg_color="#F39C12").pack(fill="x", padx=5, pady=3)
-        ctk.CTkButton(left_frame, text="Sửa Prompt Content", command=lambda: self._edit_prompt("prompt_content.txt", DEFAULT_PROMPT_CONTENT), fg_color="#555").pack(fill="x", padx=5, pady=3)
+        ctk.CTkButton(left_frame, text="\U0001f4e6 Phân tích lấy Tiêu đề / Hashtag", command=self._generate_content, 
+                      fg_color="#D4A017", hover_color="#B8860B", text_color="white",
+                      font=("", 12, "bold")).pack(fill="x", padx=5, pady=3)
+        ctk.CTkButton(left_frame, text="\u2699 Sửa Prompt Content", 
+                      command=lambda: self._edit_prompt("prompt_content.txt", DEFAULT_PROMPT_CONTENT), 
+                      fg_color="#4a4a5a", hover_color="#3a3a4a").pack(fill="x", padx=5, pady=3)
         
         # === CAU HINH DICH ===
         ctk.CTkLabel(left_frame, text="CẤU HÌNH DỊCH THUẬT", text_color="#3498DB", font=("", 12, "bold")).pack(pady=(15,5))
         
-        # Checkboxes
+        # Checkboxes with edit icons (matching old tool)
         self.chk_dubbing = ctk.BooleanVar(value=False)
         self.chk_no_punct = ctk.BooleanVar(value=False)
         self.chk_force_id = ctk.BooleanVar(value=True)
         self.chk_context = ctk.BooleanVar(value=True)
         self.chk_overlap = ctk.BooleanVar(value=False)
         
-        ctk.CTkCheckBox(left_frame, text="Lồng tiếng (Nam/Nữ)", variable=self.chk_dubbing).pack(anchor="w", padx=10, pady=2)
-        ctk.CTkCheckBox(left_frame, text="Bỏ dấu câu", variable=self.chk_no_punct).pack(anchor="w", padx=10, pady=2)
-        ctk.CTkCheckBox(left_frame, text="Ép Force đủ ID", variable=self.chk_force_id).pack(anchor="w", padx=10, pady=2)
-        ctk.CTkCheckBox(left_frame, text="Gửi kèm bộ luật Context", variable=self.chk_context).pack(anchor="w", padx=10, pady=2)
+        chk_frame1 = ctk.CTkFrame(left_frame, fg_color="transparent")
+        chk_frame1.pack(fill="x", padx=5, pady=2)
+        ctk.CTkCheckBox(chk_frame1, text="Lồng tiếng (Nam/Nữ)", variable=self.chk_dubbing).pack(side="left")
         
-        overlap_frame = ctk.CTkFrame(left_frame)
+        chk_frame2 = ctk.CTkFrame(left_frame, fg_color="transparent")
+        chk_frame2.pack(fill="x", padx=5, pady=2)
+        ctk.CTkCheckBox(chk_frame2, text="Bỏ dấu câu", variable=self.chk_no_punct).pack(side="left")
+        
+        chk_frame3 = ctk.CTkFrame(left_frame, fg_color="transparent")
+        chk_frame3.pack(fill="x", padx=5, pady=2)
+        ctk.CTkCheckBox(chk_frame3, text="Ép Force đủ ID", variable=self.chk_force_id).pack(side="left")
+        
+        chk_frame4 = ctk.CTkFrame(left_frame, fg_color="transparent")
+        chk_frame4.pack(fill="x", padx=5, pady=2)
+        ctk.CTkCheckBox(chk_frame4, text="Gửi kèm bộ luật Context", variable=self.chk_context).pack(side="left")
+        
+        overlap_frame = ctk.CTkFrame(left_frame, fg_color="transparent")
         overlap_frame.pack(fill="x", padx=5, pady=2)
         ctk.CTkCheckBox(overlap_frame, text="Gối câu (Context nối):", variable=self.chk_overlap).pack(side="left")
         self.overlap_count = ctk.CTkEntry(overlap_frame, width=40)
         self.overlap_count.insert(0, "5")
-        self.overlap_count.pack(side="right", padx=5)
+        self.overlap_count.pack(side="left", padx=5)
         
         # Delay profile
-        delay_frame = ctk.CTkFrame(left_frame)
+        delay_frame = ctk.CTkFrame(left_frame, fg_color="transparent")
         delay_frame.pack(fill="x", padx=5, pady=5)
         ctk.CTkLabel(delay_frame, text="Hạn chế Bot:").pack(side="left", padx=5)
-        self.delay_var = ctk.StringVar(value="An toàn (5-12s)")
+        self.delay_var = ctk.StringVar(value="Bình thường (3-7s)")
         self.delay_combo = ctk.CTkComboBox(delay_frame, values=list(DELAY_PROFILES.keys()), variable=self.delay_var, width=150)
         self.delay_combo.pack(side="right", padx=5)
         
         # Lines per batch
-        batch_frame = ctk.CTkFrame(left_frame)
+        batch_frame = ctk.CTkFrame(left_frame, fg_color="transparent")
         batch_frame.pack(fill="x", padx=5, pady=5)
         ctk.CTkLabel(batch_frame, text="Số dòng/Lần gửi:").pack(side="left", padx=5)
         self.batch_size_entry = ctk.CTkEntry(batch_frame, width=60)
-        self.batch_size_entry.insert(0, "50")
+        self.batch_size_entry.insert(0, "500")
         self.batch_size_entry.pack(side="right", padx=5)
         
-        # Translate button
-        self.btn_translate = ctk.CTkButton(left_frame, text="BẮT ĐẦU DỊCH", command=self._start_translate, fg_color="#27AE60", font=("", 14, "bold"))
+        # Translate button - green bold
+        self.btn_translate = ctk.CTkButton(left_frame, text="\u270F BẮT ĐẦU DỊCH", command=self._start_translate, 
+                                           fg_color="#27AE60", hover_color="#1E8449",
+                                           font=("", 14, "bold"), height=40)
         self.btn_translate.pack(fill="x", padx=5, pady=8)
         
-        ctk.CTkButton(left_frame, text="Sửa Prompt Dịch", command=lambda: self._edit_prompt("prompt_dich.txt", DEFAULT_PROMPT_DICH), fg_color="#555").pack(fill="x", padx=5, pady=3)
+        ctk.CTkButton(left_frame, text="\u2699 Sửa Prompt Dịch", 
+                      command=lambda: self._edit_prompt("prompt_dich.txt", DEFAULT_PROMPT_DICH), 
+                      fg_color="#4a4a5a", hover_color="#3a3a4a").pack(fill="x", padx=5, pady=3)
         
-        # Error detection - retranslate missing lines
-        self.btn_error = ctk.CTkButton(left_frame, text="KHÔNG PHÁT HIỆN LỖI", fg_color="#27AE60", command=self._show_missing_lines, state="disabled")
+        # Error detection - orange/red like old tool
+        self.btn_error = ctk.CTkButton(left_frame, text="\u26A0 KHÔNG PHÁT HIỆN LỖI", 
+                                       fg_color="#27AE60", hover_color="#1E8449",
+                                       command=self._show_missing_lines, state="disabled",
+                                       font=("", 12, "bold"), height=36)
         self.btn_error.pack(fill="x", padx=5, pady=8)
         
         # Export
-        ctk.CTkButton(left_frame, text="Xuất File SRT", command=self._export_srt, fg_color="#555").pack(fill="x", padx=5, pady=3)
+        ctk.CTkButton(left_frame, text="\U0001f4be Xuất File SRT", command=self._export_srt, 
+                      fg_color="#4a4a5a", hover_color="#3a3a4a").pack(fill="x", padx=5, pady=3)
         
         # Right Panel (table + log)
-        right_frame = ctk.CTkFrame(self)
-        right_frame.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
+        right_frame = ctk.CTkFrame(self, fg_color="#0d0d1a")
+        right_frame.grid(row=0, column=1, sticky="nsew", padx=0, pady=0)
         right_frame.grid_columnconfigure(0, weight=1)
         right_frame.grid_rowconfigure(0, weight=1)
         
-        # Table
-        table_frame = ctk.CTkFrame(right_frame)
+        # Table with dark theme matching old tool
+        table_frame = ctk.CTkFrame(right_frame, fg_color="#0d0d1a")
         table_frame.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
         table_frame.grid_columnconfigure(0, weight=1)
         table_frame.grid_rowconfigure(0, weight=1)
         
+        # Style the Treeview to match old tool (dark bg, colored headers, colored text)
+        style = ttk.Style()
+        style.theme_use("clam")
+        style.configure("Custom.Treeview",
+                        background="#0d0d1a",
+                        foreground="#E0E0E0",
+                        fieldbackground="#0d0d1a",
+                        rowheight=24,
+                        font=("", 10))
+        style.configure("Custom.Treeview.Heading",
+                        background="#1a1a2e",
+                        foreground="#00CED1",
+                        font=("", 10, "bold"),
+                        relief="flat")
+        style.map("Custom.Treeview",
+                  background=[("selected", "#2a2a4e")],
+                  foreground=[("selected", "#FFFFFF")])
+        style.map("Custom.Treeview.Heading",
+                  background=[("active", "#2a2a3e")])
+        
         columns = ("check", "id", "time", "original", "translated")
-        self.tree = ttk.Treeview(table_frame, columns=columns, show="headings", height=25)
+        self.tree = ttk.Treeview(table_frame, columns=columns, show="headings", 
+                                 height=25, style="Custom.Treeview")
         self.tree.heading("check", text="[X]")
         self.tree.heading("id", text="ID")
         self.tree.heading("time", text="Time")
         self.tree.heading("original", text="Bản Gốc")
         self.tree.heading("translated", text="Bản Dịch")
         
-        self.tree.column("check", width=30, anchor="center")
-        self.tree.column("id", width=40, anchor="center")
-        self.tree.column("time", width=150, anchor="center")
+        self.tree.column("check", width=35, anchor="center")
+        self.tree.column("id", width=45, anchor="center")
+        self.tree.column("time", width=180, anchor="center")
         self.tree.column("original", width=350)
         self.tree.column("translated", width=350)
+        
+        # Tag for colored text in treeview
+        self.tree.tag_configure("original_row", foreground="#E8A0BF")  # Pink/purple for Chinese text
+        self.tree.tag_configure("translated_row", foreground="#90EE90")  # Light green for translated
         
         scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscrollcommand=scrollbar.set)
@@ -318,12 +375,13 @@ class HMAutoTranslator(ctk.CTk):
         scrollbar.grid(row=0, column=1, sticky="ns")
         
         # Progress bar
-        self.progress = ctk.CTkProgressBar(right_frame)
+        self.progress = ctk.CTkProgressBar(right_frame, progress_color="#2E86C1")
         self.progress.grid(row=1, column=0, sticky="ew", padx=5, pady=3)
         self.progress.set(0)
         
-        # Log area
-        self.log_text = ctk.CTkTextbox(right_frame, height=120, fg_color="#1a1a2e")
+        # Log area - dark with green text like terminal
+        self.log_text = ctk.CTkTextbox(right_frame, height=130, fg_color="#0d0d1a", 
+                                       text_color="#00FF88", font=("Consolas", 11))
         self.log_text.grid(row=2, column=0, sticky="ew", padx=2, pady=2)
     
     def _log(self, msg):
@@ -430,7 +488,7 @@ class HMAutoTranslator(ctk.CTk):
         for sub in self.subtitles:
             translated = self.translated.get(sub['id'], "")
             self.tree.insert("", "end", values=(
-                "✓" if translated else "",
+                "[X]" if translated else "",
                 sub['id'],
                 sub['time'],
                 sub['text'][:80],
@@ -659,7 +717,7 @@ class HMAutoTranslator(ctk.CTk):
             line_id = int(values[1])
             if line_id in self.translated:
                 self.tree.item(item, values=(
-                    "✓",
+                    "[X]",
                     values[1],
                     values[2],
                     values[3],
