@@ -164,61 +164,56 @@ async def _send_to_gemini(prompt_text):
     except:
         _gemini_response_count_before = 0
     
-    # Method 1: Try to inject text via JavaScript into contenteditable
-    js_inject = """
-    (text) => {
-        // Try .ql-editor (Quill editor - logged in Gemini)
-        let editor = document.querySelector('.ql-editor');
-        if (editor) {
-            editor.innerHTML = '<p>' + text.replace(/\\n/g, '</p><p>') + '</p>';
-            editor.dispatchEvent(new Event('input', { bubbles: true }));
-            return 'ql-editor';
+    # Use clipboard paste method (avoids TrustedHTML CSP errors on Gemini)
+    # Gemini enforces Trusted Types so innerHTML/innerText injection fails
+    js_copy = """
+    async (text) => {
+        try { await navigator.clipboard.writeText(text); }
+        catch (e) {
+            const ta = document.createElement("textarea");
+            ta.value = text; ta.style.position = "fixed"; ta.style.left = "-9999px";
+            document.body.appendChild(ta); ta.focus(); ta.select();
+            document.execCommand("copy"); document.body.removeChild(ta);
         }
-        // Try contenteditable div
-        let editable = document.querySelector('div[contenteditable="true"]');
-        if (editable) {
-            editable.innerText = text;
-            editable.dispatchEvent(new Event('input', { bubbles: true }));
-            return 'contenteditable';
-        }
-        // Try textarea
-        let ta = document.querySelector('textarea');
-        if (ta) {
-            ta.value = text;
-            ta.dispatchEvent(new Event('input', { bubbles: true }));
-            return 'textarea';
-        }
-        return null;
     }
     """
+    await page.evaluate(js_copy, prompt_text)
+    await asyncio.sleep(0.5)
     
-    inject_result = await page.evaluate(js_inject, prompt_text)
+    # Find and click input area
+    input_selectors = [
+        ".ql-editor",
+        "div[contenteditable='true']",
+        "rich-textarea div[contenteditable]",
+        "div[aria-label*='Enter a prompt']",
+        "div[aria-label*='prompt']",
+        "textarea",
+    ]
     
-    if not inject_result:
-        # Fallback: clipboard paste
-        js_copy = """
-        async (text) => {
-            try { await navigator.clipboard.writeText(text); }
-            catch (e) {
-                const ta = document.createElement("textarea");
-                ta.value = text; ta.style.position = "fixed"; ta.style.left = "-9999px";
-                document.body.appendChild(ta); ta.focus(); ta.select();
-                document.execCommand("copy"); document.body.removeChild(ta);
-            }
-        }
-        """
-        await page.evaluate(js_copy, prompt_text)
-        await asyncio.sleep(0.3)
-        
-        # Find and click input
-        input_box = page.locator(".ql-editor, div[contenteditable='true'], textarea").first
-        await input_box.click()
-        await asyncio.sleep(0.2)
-        await page.keyboard.press(f"{cmd_ctrl}+A")
-        await page.keyboard.press("Backspace")
-        await asyncio.sleep(0.2)
-        await page.keyboard.press(f"{cmd_ctrl}+V")
+    input_box = None
+    for selector in input_selectors:
+        try:
+            loc = page.locator(selector).first
+            if await loc.count() > 0 and await loc.is_visible():
+                input_box = loc
+                break
+        except:
+            continue
     
+    if not input_box:
+        input_box = page.locator("[contenteditable='true']").first
+    
+    await input_box.click()
+    await asyncio.sleep(0.3)
+    
+    # Clear existing text
+    await page.keyboard.press(f"{cmd_ctrl}+A")
+    await asyncio.sleep(0.1)
+    await page.keyboard.press("Backspace")
+    await asyncio.sleep(0.3)
+    
+    # Paste from clipboard
+    await page.keyboard.press(f"{cmd_ctrl}+V")
     await asyncio.sleep(1.0)
     
     # Click send button
