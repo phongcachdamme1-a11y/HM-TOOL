@@ -33,9 +33,17 @@ DEFAULT_PROMPT_PHAN_TICH = """Hãy đóng vai chuyên gia ngôn ngữ, soạn th
 DEFAULT_PROMPT_DICH = """DỊCH CÁC DÒNG DƯỚI ĐÂY SANG TIẾNG VIỆT (DỊCH NGHĨA, KHÔNG PHIÊN ÂM).
 YÊU CẦU CỐT LÕI:
 1. Giữ nguyên ID [số]. Trả về dạng Code Block.
-2. DỊCH NGHĨA tự nhiên sang tiếng Việt. TUYỆT ĐỐI KHÔNG phiên âm Hán Việt nguyên văn. Phải dịch thành câu tiếng Việt có nghĩa, dễ hiểu.
+2. DỊCH NGHĨA tự nhiên sang tiếng Việt. TUYỆT ĐỐI KHÔNG phiên âm Hán Việt nguyên văn.
 3. XỬ LÝ CHÚ THÍCH: (nhạc), (vỗ tay)... -> Giữ ID, trả nội dung rỗng. Ví dụ: '[1] '.
-4. Mỗi dòng dịch phải là tiếng Việt thuần túy, mạch lạc, đúng ngữ cảnh phim."""
+
+YÊU CẦU CHẤT LƯỢNG DỊCH:
+4. Dịch theo lối NÓI tự nhiên của người Việt, KHÔNG dịch word-by-word. Câu dịch phải nghe như người Việt đang nói chuyện thật.
+5. Giữ ngắn gọn, súc tích - phù hợp phụ đề (tối đa 2 dòng/câu). Không thêm từ thừa.
+6. Thành ngữ/tục ngữ Trung Quốc -> Chuyển thành cách nói tương đương tiếng Việt (KHÔNG dịch từng chữ).
+7. Ngữ khí nhân vật: Giữ đúng cảm xúc (giận dữ, dịu dàng, châm biếm...). Dùng từ ngữ phù hợp giọng điệu.
+8. Tên riêng: Giữ nguyên phiên âm Hán Việt của TÊN NGƯỜI (VD: 林玄霜 = Lâm Huyền Sương). Địa danh giữ nguyên nếu quen thuộc.
+9. Từ đệm/lấp chỗ (那个/就是/然后): Chỉ dịch khi cần thiết cho ngữ cảnh, bỏ nếu thừa.
+10. Câu ngắn 1-2 từ (嗯/好/走): Dịch thành từ tự nhiên (Ừ/Được/Đi thôi) thay vì dịch cứng nhắc."""
 
 DEFAULT_PROMPT_CONTENT = """Dựa vào TOÀN BỘ nội dung phụ đề phim dưới đây, hãy trở thành một chuyên gia Marketing và viết giúp tôi:
 1. 05 Tiêu đề giật tít, thu hút người xem (phù hợp làm mồi câu view).
