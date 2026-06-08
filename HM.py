@@ -671,6 +671,10 @@ class HMAutoTranslator(ctk.CTk):
         win = ctk.CTkToplevel(self)
         win.title("Phân Tích & Ngữ Cảnh")
         win.geometry("900x600")
+        win.attributes("-topmost", True)
+        win.after(500, lambda: win.attributes("-topmost", False))
+        win.focus_force()
+        win.grab_set()
         
         left = ctk.CTkFrame(win, width=250)
         left.pack(side="left", fill="y", padx=5, pady=5)
