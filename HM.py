@@ -30,20 +30,65 @@ DEFAULT_PROMPT_PHAN_TICH = """Hãy đóng vai chuyên gia ngôn ngữ, soạn th
 4. Bảng Từ vựng CẤM TUYỆT ĐỐI (VD: Cổ trang cấm 'Ok', 'Bye').
 5. Xử lý từ cảm thán: '哈' -> 'ha ha!', '哎' -> 'Ây/Haizz'."""
 
-DEFAULT_PROMPT_DICH = """DỊCH CÁC DÒNG DƯỚI ĐÂY SANG TIẾNG VIỆT (DỊCH NGHĨA, KHÔNG PHIÊN ÂM).
-YÊU CẦU CỐT LÕI:
-1. Giữ nguyên ID [số]. Trả về dạng Code Block.
-2. DỊCH NGHĨA tự nhiên sang tiếng Việt. TUYỆT ĐỐI KHÔNG phiên âm Hán Việt nguyên văn.
-3. XỬ LÝ CHÚ THÍCH: (nhạc), (vỗ tay)... -> Giữ ID, trả nội dung rỗng. Ví dụ: '[1] '.
+DEFAULT_PROMPT_DICH = """BẠN LÀ CHUYÊN GIA DỊCH PHỤ ĐỀ PHIM TRUNG QUỐC SANG TIẾNG VIỆT.
+Hãy dịch các dòng dưới đây sao cho MỌI CÂU đều mượt mà, tự nhiên như người Việt nói hàng ngày.
 
-YÊU CẦU CHẤT LƯỢNG DỊCH:
-4. Dịch theo lối NÓI tự nhiên của người Việt, KHÔNG dịch word-by-word. Câu dịch phải nghe như người Việt đang nói chuyện thật.
-5. Giữ ngắn gọn, súc tích - phù hợp phụ đề (tối đa 2 dòng/câu). Không thêm từ thừa.
-6. Thành ngữ/tục ngữ Trung Quốc -> Chuyển thành cách nói tương đương tiếng Việt (KHÔNG dịch từng chữ).
-7. Ngữ khí nhân vật: Giữ đúng cảm xúc (giận dữ, dịu dàng, châm biếm...). Dùng từ ngữ phù hợp giọng điệu.
-8. Tên riêng: Giữ nguyên phiên âm Hán Việt của TÊN NGƯỜI (VD: 林玄霜 = Lâm Huyền Sương). Địa danh giữ nguyên nếu quen thuộc.
-9. Từ đệm/lấp chỗ (那个/就是/然后): Chỉ dịch khi cần thiết cho ngữ cảnh, bỏ nếu thừa.
-10. Câu ngắn 1-2 từ (嗯/好/走): Dịch thành từ tự nhiên (Ừ/Được/Đi thôi) thay vì dịch cứng nhắc."""
+═══ QUY TẮC ĐỊNH DẠNG ═══
+1. Giữ nguyên ID [số]. Trả về trong Code Block duy nhất.
+2. Mỗi dòng có dạng: [ID] Câu dịch tiếng Việt
+3. XỬ LÝ CHÚ THÍCH/NHẠC: (nhạc), (vỗ tay), ♪... -> Giữ ID, nội dung rỗng. VD: '[1] '
+
+═══ NGUYÊN TẮC DỊCH NGHĨA ═══
+4. TUYỆT ĐỐI KHÔNG phiên âm Hán Việt. Phải dịch thành câu tiếng Việt CÓ NGHĨA.
+   ❌ SAI: "Ngã bất tri đạo" / "Nhĩ thị thùy"
+   ✅ ĐÚNG: "Tôi không biết" / "Ngươi là ai"
+5. KHÔNG dịch từng từ (word-by-word). Phải hiểu CẢ CÂU rồi diễn đạt lại bằng tiếng Việt tự nhiên.
+   ❌ SAI: "Anh ta đối với cô ấy nói rằng"
+   ✅ ĐÚNG: "Hắn nói với cô ấy"
+
+═══ VĂN PHONG TỰ NHIÊN ═══
+6. Câu dịch phải nghe như NGƯỜI VIỆT ĐANG NÓI CHUYỆN THẬT, không phải văn dịch máy.
+7. Ngắn gọn, súc tích. Phụ đề phải đọc nhanh trong 2-3 giây. Bỏ hết từ thừa, rườm rà.
+8. Dùng văn nói: "thôi đi", "biết rồi", "làm gì thế", "sao vậy?" thay vì "hãy dừng lại", "tôi đã biết rồi".
+9. Câu cảm thán phải tự nhiên:
+   - 哈哈 -> Ha ha / Haha
+   - 哎 -> Ây / Haizz  
+   - 哼 -> Hừ / Hứ
+   - 啊/呀 -> A / Ôi / Trời ơi
+   - 喂 -> Ê / Này / Alô (tùy ngữ cảnh)
+
+═══ NGỮ KHÍ & CẢM XÚC ═══
+10. Giữ đúng GIỌNG ĐIỆU nhân vật qua cách chọn từ:
+    - Giận dữ: "Mày dám!", "Cút!", "Đồ khốn!"
+    - Dịu dàng: "Em à...", "Không sao đâu"
+    - Châm biếm: "Ồ, giỏi thật đấy", "Hay nhỉ"
+    - Kiêu ngạo: "Ngươi cũng xứng?", "Một đám phế vật"
+    - Van xin: "Xin ngài tha mạng!", "Cầu xin người..."
+11. Câu hỏi tu từ (反问) -> dịch thành câu hỏi mỉa mai/nhấn mạnh tự nhiên:
+    ❌ "Ngươi không phải là rất giỏi sao?"
+    ✅ "Mày không phải rất giỏi à? / Giỏi lắm cơ mà?"
+
+═══ XỬ LÝ TÊN RIÊNG & THUẬT NGỮ ═══
+12. TÊN NGƯỜI: Phiên âm Hán Việt (林玄霜 = Lâm Huyền Sương, 陆明 = Lục Minh).
+13. TÊN MÔN PHÁI/BANG HỘI: Dịch Hán Việt (青云门 = Thanh Vân Môn).
+14. TÊN CHIÊU THỨC: Giữ Hán Việt nếu nghe hay (降龙掌 = Hàng Long Chưởng). Nếu dài/khó hiểu thì dịch nghĩa.
+15. ĐỊA DANH: Hán Việt quen thuộc giữ nguyên (长安 = Trường An). Nơi lạ thì dịch/phiên âm.
+
+═══ XỬ LÝ CÂU ĐẶC BIỆT ═══
+16. Thành ngữ/tục ngữ TQ -> Dịch thành cách nói TƯƠNG ĐƯƠNG tiếng Việt, KHÔNG dịch từng chữ.
+    ❌ "Một đao hai đoạn" 
+    ✅ "Một nhát dao dứt khoát" / "Cắt đứt sạch"
+17. Câu cực ngắn 1-2 từ -> Dịch tự nhiên:
+    - 嗯 -> Ừ / Ừm
+    - 好 -> Được / Tốt / Ừ
+    - 走 -> Đi / Đi thôi
+    - 是 -> Vâng / Phải / Đúng
+    - 不要 -> Đừng / Không
+    - 快 -> Nhanh lên / Mau
+    - 等等 -> Khoan / Đợi đã
+18. Từ đệm vô nghĩa (那个/就是/然后/这个) -> BỎ nếu không cần. Chỉ giữ khi tạo hiệu ứng ngập ngừng.
+19. Câu lặp lại ý (nhấn mạnh trong tiếng Trung) -> Gộp lại, chỉ dịch 1 lần cho gọn.
+20. Số đếm/đơn vị: Dùng đơn vị Việt Nam quen thuộc (里 -> dặm/lý, 两 -> lạng, 石 -> thạch)."""
 
 DEFAULT_PROMPT_CONTENT = """Dựa vào TOÀN BỘ nội dung phụ đề phim dưới đây, hãy trở thành một chuyên gia Marketing và viết giúp tôi:
 1. 05 Tiêu đề giật tít, thu hút người xem (phù hợp làm mồi câu view).
