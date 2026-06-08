@@ -18,6 +18,7 @@ browser = None
 context = None
 playwright_instance = None
 current_ai = "deepseek"
+_gemini_response_count_before = 0
 
 
 class ChatRequest(BaseModel):
@@ -142,12 +143,28 @@ async def stop_generation():
 
 async def _send_to_gemini(prompt_text):
     """Send prompt to Gemini using JavaScript injection + clipboard fallback"""
-    global page
+    global page, _gemini_response_count_before
     
     cmd_ctrl = "Meta" if sys.platform == "darwin" else "Control"
     
+    # Count existing responses BEFORE sending (to detect new one later)
+    js_count = """
+    () => {
+        let count = 0;
+        let selectors = ['model-response', 'message-content', '.message-content', '[data-message-author-role="model"]'];
+        for (let s of selectors) {
+            let els = document.querySelectorAll(s);
+            if (els.length > count) count = els.length;
+        }
+        return count;
+    }
+    """
+    try:
+        _gemini_response_count_before = await page.evaluate(js_count)
+    except:
+        _gemini_response_count_before = 0
+    
     # Method 1: Try to inject text via JavaScript into contenteditable
-    # This is the most reliable method for Gemini's rich text editor
     js_inject = """
     (text) => {
         // Try .ql-editor (Quill editor - logged in Gemini)
@@ -236,7 +253,7 @@ async def _send_to_gemini(prompt_text):
 
 async def _wait_for_response_gemini():
     """Wait for Gemini response to complete with robust detection"""
-    global page
+    global page, _gemini_response_count_before
     
     await asyncio.sleep(5)
     
@@ -244,83 +261,75 @@ async def _wait_for_response_gemini():
     last_text = ""
     idle_seconds = 0
     max_wait = 900  # 15 minutes max
-    found_response = False
+    prev_count = getattr(sys.modules[__name__], '_gemini_response_count_before', 0)
     
     while True:
         elapsed = asyncio.get_event_loop().time() - start_time
         if elapsed > max_wait:
             return {"status": "timeout", "text": "Timeout - qua 15 phut khong co phan hoi"}
         
-        # Use JavaScript to extract response text directly from DOM
-        # This is more reliable than CSS selectors because Gemini changes its DOM frequently
+        # Use JavaScript to get the LATEST response (newer than prev_count)
         js_get_response = """
-        () => {
-            // Method 1: model-response elements
-            let responses = document.querySelectorAll('model-response');
-            if (responses.length > 0) {
-                let last = responses[responses.length - 1];
-                let codeBlock = last.querySelector('pre, code-block');
-                if (codeBlock) return {text: codeBlock.innerText, found: true};
-                return {text: last.innerText, found: true};
+        (prevCount) => {
+            // Try multiple response containers
+            let selectors = ['model-response', 'message-content', '.message-content', '[data-message-author-role="model"]'];
+            let responses = [];
+            
+            for (let s of selectors) {
+                let els = document.querySelectorAll(s);
+                if (els.length > 0) {
+                    responses = els;
+                    break;
+                }
             }
-            // Method 2: message-content with model role
-            responses = document.querySelectorAll('[data-message-author-role="model"], .model-response-text');
-            if (responses.length > 0) {
-                let last = responses[responses.length - 1];
-                let codeBlock = last.querySelector('pre, code-block');
-                if (codeBlock) return {text: codeBlock.innerText, found: true};
-                return {text: last.innerText, found: true};
+            
+            if (responses.length === 0) {
+                return {text: '', found: false, count: 0};
             }
-            // Method 3: message-content elements (generic)
-            responses = document.querySelectorAll('message-content, .message-content');
-            if (responses.length > 0) {
-                let last = responses[responses.length - 1];
-                let codeBlock = last.querySelector('pre, code-block');
-                if (codeBlock) return {text: codeBlock.innerText, found: true};
-                return {text: last.innerText, found: true};
+            
+            // Get the LAST response (newest)
+            let last = responses[responses.length - 1];
+            
+            // Check if this is a NEW response (count > prevCount)
+            let isNew = responses.length > prevCount;
+            
+            // Extract text - prefer code blocks
+            let codeBlock = last.querySelector('pre code, pre, code-block, .code-block');
+            let text = '';
+            if (codeBlock) {
+                text = codeBlock.innerText || codeBlock.textContent || '';
+            } else {
+                text = last.innerText || last.textContent || '';
             }
-            // Method 4: any response-like container
-            responses = document.querySelectorAll('.response-container, .markdown-main-panel');
-            if (responses.length > 0) {
-                let last = responses[responses.length - 1];
-                return {text: last.innerText, found: true};
-            }
-            return {text: '', found: false};
+            
+            return {text: text, found: true, count: responses.length, isNew: isNew};
         }
         """
         
         try:
-            result = await page.evaluate(js_get_response)
+            result = await page.evaluate(js_get_response, prev_count)
         except:
-            await asyncio.sleep(1)
-            continue
-        
-        current_text = result.get('text', '')
-        found_response = result.get('found', False)
-        
-        if not found_response or not current_text.strip():
-            # Check if still loading
-            js_check_loading = """
-            () => {
-                let loading = document.querySelector('.loading-indicator, mat-progress-bar, [aria-busy="true"], .generating, .thinking-indicator');
-                return loading !== null;
-            }
-            """
-            try:
-                is_loading = await page.evaluate(js_check_loading)
-                if is_loading:
-                    idle_seconds = 0
-            except:
-                pass
-            
             await asyncio.sleep(2)
             continue
         
-        # Compare with previous text
-        if current_text == last_text and len(current_text) > 10:
+        current_text = result.get('text', '')
+        found = result.get('found', False)
+        is_new = result.get('isNew', False)
+        
+        if not found or not current_text.strip():
+            await asyncio.sleep(2)
+            continue
+        
+        # Only process if it's a NEW response
+        if not is_new and elapsed < 15:
+            await asyncio.sleep(2)
+            continue
+        
+        # Compare with previous text to detect generation complete
+        if current_text == last_text and len(current_text) > 20:
             idle_seconds += 1
             if idle_seconds >= 10:
-                # Response complete
+                # Response complete - text hasn't changed for 10 seconds
                 break
         else:
             idle_seconds = 0

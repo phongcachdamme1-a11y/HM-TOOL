@@ -279,8 +279,8 @@ class HMAutoTranslator(ctk.CTk):
         
         ctk.CTkButton(left_frame, text="Sửa Prompt Dịch", command=lambda: self._edit_prompt("prompt_dich.txt", DEFAULT_PROMPT_DICH), fg_color="#555").pack(fill="x", padx=5, pady=3)
         
-        # Error detection
-        self.btn_error = ctk.CTkButton(left_frame, text="KHÔNG PHÁT HIỆN LỖI", fg_color="#27AE60", state="disabled")
+        # Error detection - retranslate missing lines
+        self.btn_error = ctk.CTkButton(left_frame, text="KHÔNG PHÁT HIỆN LỖI", fg_color="#27AE60", command=self._show_missing_lines, state="disabled")
         self.btn_error.pack(fill="x", padx=5, pady=8)
         
         # Export
@@ -671,10 +671,10 @@ class HMAutoTranslator(ctk.CTk):
         win = ctk.CTkToplevel(self)
         win.title("Phân Tích & Ngữ Cảnh")
         win.geometry("900x600")
-        win.attributes("-topmost", True)
-        win.after(500, lambda: win.attributes("-topmost", False))
+        win.transient(self)
+        win.lift()
         win.focus_force()
-        win.grab_set()
+        win.after(100, win.lift)
         
         left = ctk.CTkFrame(win, width=250)
         left.pack(side="left", fill="y", padx=5, pady=5)
@@ -731,6 +731,67 @@ class HMAutoTranslator(ctk.CTk):
         
         ctk.CTkLabel(left, text="* Lưu ý: Nút Lưu ở trên chỉ đưa\nluật vào RAM, tool sẽ tự nạp\nvào prompt khi bạn tích\n'Gửi kèm bộ luật Context'.",
                      font=("", 10), text_color="#888").pack(padx=10, pady=20)
+    
+    def _show_missing_lines(self):
+        """Show window with missing/untranslated lines and option to retranslate"""
+        missing_ids = [s['id'] for s in self.subtitles if s['id'] not in self.translated]
+        
+        if not missing_ids:
+            messagebox.showinfo("OK", "Không có dòng nào thiếu!")
+            return
+        
+        win = ctk.CTkToplevel(self)
+        win.title(f"Dòng Thiếu - {len(missing_ids)} dòng")
+        win.geometry("700x500")
+        win.transient(self)
+        win.lift()
+        win.focus_force()
+        win.after(100, win.lift)
+        
+        # Top info
+        ctk.CTkLabel(win, text=f"Phát hiện {len(missing_ids)} dòng chưa dịch", 
+                     font=("", 14, "bold"), text_color="#E74C3C").pack(pady=10)
+        
+        # List of missing lines
+        list_frame = ctk.CTkFrame(win)
+        list_frame.pack(fill="both", expand=True, padx=10, pady=5)
+        
+        # Treeview for missing lines
+        columns = ("id", "text")
+        tree = ttk.Treeview(list_frame, columns=columns, show="headings", height=15)
+        tree.heading("id", text="ID")
+        tree.heading("text", text="Nội dung gốc")
+        tree.column("id", width=60, anchor="center")
+        tree.column("text", width=600)
+        
+        scrollbar = ttk.Scrollbar(list_frame, orient="vertical", command=tree.yview)
+        tree.configure(yscrollcommand=scrollbar.set)
+        tree.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        
+        for sub in self.subtitles:
+            if sub['id'] in missing_ids:
+                tree.insert("", "end", values=(sub['id'], sub['text'][:100]))
+        
+        # Buttons
+        btn_frame = ctk.CTkFrame(win)
+        btn_frame.pack(fill="x", padx=10, pady=10)
+        
+        def retranslate_missing():
+            """Retranslate all missing lines"""
+            win.destroy()
+            # Set translated to only keep existing, then start translate
+            self._log(f"Bắt đầu dịch lại {len(missing_ids)} dòng thiếu...")
+            self.is_translating = True
+            self.btn_translate.configure(text="DỪNG DỊCH", fg_color="#E74C3C")
+            threading.Thread(target=self._translate_worker, daemon=True).start()
+        
+        ctk.CTkButton(btn_frame, text=f"DỊCH LẠI {len(missing_ids)} DÒNG THIẾU", 
+                      command=retranslate_missing, fg_color="#27AE60", 
+                      font=("", 13, "bold")).pack(side="left", padx=5)
+        
+        ctk.CTkButton(btn_frame, text="Đóng", command=win.destroy, 
+                      fg_color="#555").pack(side="right", padx=5)
     
     def _generate_content(self):
         """Generate content titles/hashtags"""
